@@ -151,17 +151,27 @@ install(FILES ${DBoW2_PATH} DESTINATION lib)
 install(FILES ${g2o_PATH} DESTINATION lib)
 
 
-# Add executable
+# Add executables
 add_executable(mono_node_cpp
   src/mono_example.cpp
   src/common.cpp
+)
+
+add_executable(rgbd_node_cpp
+  src/rgbd_example.cpp
+  src/rgbd_common.cpp
 )
 
 ament_target_dependencies(mono_node_cpp
   PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS}
 )
 
+ament_target_dependencies(rgbd_node_cpp
+  PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
+
 target_link_libraries(mono_node_cpp PUBLIC orb_slam3_lib) # Link a node with the internal shared library
+target_link_libraries(rgbd_node_cpp PUBLIC orb_slam3_lib) # Link a node with the internal shared library
 
 
 # Install all the header files in package/package/include
@@ -169,8 +179,8 @@ install (DIRECTORY include/
         DESTINATION include
 )
 
-# Install our node and library
-install(TARGETS mono_node_cpp orb_slam3_lib
+# Install our nodes and library
+install(TARGETS mono_node_cpp rgbd_node_cpp orb_slam3_lib
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -191,9 +201,11 @@ ament_export_dependencies(
 # Install Python modules, submodules
 ament_python_install_package(${PROJECT_NAME}) # Install the modules in ros2_orb_slam3/ros2_orb_slam3 folder
 
-# Install Python executibles
+# Install Python executables
 install(PROGRAMS
   scripts/mono_driver_node.py
+  scripts/rgbd_driver_node.py
+  scripts/test_rgbd.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

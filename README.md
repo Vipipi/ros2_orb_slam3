@@ -126,7 +126,7 @@ Follow the steps below to create the ```ros2_test``` workspace, install dependen
 cd ~
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
-git clone https://github.com/Mechazo11/ros2_orb_slam3.git
+git clone -b rgb-d https://github.com/Vipipi/ros2_orb_slam3.git
 cd .. # make sure you are in ~/ros2_ws root directory
 rosdep install -r --from-paths src --ignore-src -y --rosdistro humble
 source /opt/ros/humble/setup.bash

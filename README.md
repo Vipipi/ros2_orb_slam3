@@ -124,10 +124,10 @@ Follow the steps below to create the ```ros2_test``` workspace, install dependen
 
 ```bash
 cd ~
-mkdir -p ~/ros2_ws/src
-cd ~/ros2_ws/src
+mkdir -p ~/ros2_test/src
+cd ~/ros2_test/src
 git clone -b rgb-d https://github.com/Vipipi/ros2_orb_slam3.git
-cd .. # make sure you are in ~/ros2_ws root directory
+cd .. # make sure you are in ~/ros2_test root directory
 rosdep install -r --from-paths src --ignore-src -y --rosdistro humble
 source /opt/ros/humble/setup.bash
 colcon build --symlink-install
@@ -139,7 +139,7 @@ Run the builtin example to verify the package is working correctly
 In one terminal [cpp node]
 
 ```bash
-cd ~/ros2_ws/
+cd ~/ros2_test/
 source ./install/setup.bash
 ros2 run ros2_orb_slam3 mono_node_cpp --ros-args -p node_name_arg:=mono_slam_cpp
 ```
@@ -147,7 +147,7 @@ ros2 run ros2_orb_slam3 mono_node_cpp --ros-args -p node_name_arg:=mono_slam_cpp
 In another terminal [python node]
 
 ```bash
-cd ~/ros2_ws
+cd ~/ros2_test
 source ./install/setup.bash
 ros2 run ros2_orb_slam3 mono_driver_node.py --ros-args -p settings_name:=EuRoC -p image_seq:=sample_euroc_MH05
 ```

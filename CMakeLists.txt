@@ -172,7 +172,7 @@ ament_target_dependencies(mono_direct_cpp
 )
 
 target_link_libraries(mono_node_cpp PUBLIC orb_slam3_lib) # Link a node with the internal shared library
-target_link_libraries(mono_direct_node_cpp PUBLIC orb_slam3_lib) # Link a node with the internal shared library
+target_link_libraries(mono_direct_cpp PUBLIC orb_slam3_lib) # Link a node with the internal shared library
 
 
 # Install all the header files in package/package/include
@@ -181,7 +181,7 @@ install (DIRECTORY include/
 )
 
 # Install our nodes and library
-install(TARGETS mono_node_cpp mono_direct_node_cpp orb_slam3_lib
+install(TARGETS mono_node_cpp mono_direct_cpp orb_slam3_lib
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

@@ -1,0 +1,41 @@
+%YAML:1.0
+
+Camera.type: "PinHole"
+
+Camera.width: 1280
+Camera.height: 720
+
+Camera.fx: 1108.5125
+Camera.fy: 1108.5125
+Camera.cx: 640.0
+Camera.cy: 360.0
+
+Camera.fps: 30.0  # Adjust if your Isaac Sim output differs
+
+# ORB-SLAM3 settings for monocular mode
+Viewer.Active: true
+Camera.bf: 40.0  # Required field, not used in mono but may be checked internally
+ThDepth: 40.0     # Threshold for depth association, used in stereo/RGBD but harmless here
+
+# Feature and map settings (optional tuning)
+ORBextractor.nFeatures: 1000
+ORBextractor.scaleFactor: 1.2
+ORBextractor.nLevels: 8
+ORBextractor.iniThFAST: 20
+ORBextractor.minThFAST: 7
+
+# System settings
+LoopClosing: true
+MapReuse: true
+
+# Viewer Parameters
+Viewer.KeyFrameSize: 0.05
+Viewer.KeyFrameLineWidth: 1.0
+Viewer.GraphLineWidth: 0.9
+Viewer.PointSize: 2.0
+Viewer.CameraSize: 0.08
+Viewer.CameraLineWidth: 3.0
+Viewer.ViewpointX: 0.0
+Viewer.ViewpointY: -0.7
+Viewer.ViewpointZ: -1.8
+Viewer.ViewpointF: 500.0

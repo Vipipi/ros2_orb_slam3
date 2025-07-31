@@ -121,7 +121,7 @@ void MonocularDirectMode::initializeVSLAM(std::string& configString){
 }
 
 //* Callback to process image message and run SLAM node
-void MonocularMode::Img_callback(const sensor_msgs::msg::Image& msg)
+void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
 {
     // Initialize
     cv_bridge::CvImagePtr cv_ptr; //* Does not create a copy, memory efficient

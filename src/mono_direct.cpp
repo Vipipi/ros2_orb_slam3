@@ -123,6 +123,10 @@ void MonocularDirectMode::initializeVSLAM(std::string& configString){
 //* Callback to process image message and run SLAM node
 void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
 {
+    // DEBUG: Log message reception
+    RCLCPP_INFO(this->get_logger(), "Received image message - Size: %dx%d, Encoding: %s", 
+                 msg.width, msg.height, msg.encoding.c_str());
+    
     // Initialize
     cv_bridge::CvImagePtr cv_ptr; //* Does not create a copy, memory efficient
     
@@ -132,6 +136,10 @@ void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
         //cv::Mat im =  cv_bridge::toCvShare(msg.img, msg)->image;
         cv_ptr = cv_bridge::toCvCopy(msg); // Local scope
         
+        // DEBUG: Log successful conversion
+        RCLCPP_INFO(this->get_logger(), "Successfully converted image to OpenCV format - Size: %dx%d", 
+                    cv_ptr->image.cols, cv_ptr->image.rows);
+        
         // DEBUGGING, Show image
         // Update GUI Window
         // cv::imshow("test_window", cv_ptr->image);
@@ -139,7 +147,7 @@ void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
     }
     catch (cv_bridge::Exception& e)
     {
-        RCLCPP_ERROR(this->get_logger(),"Error reading image");
+        RCLCPP_ERROR(this->get_logger(),"Error reading image: %s", e.what());
         return;
     }
     
@@ -151,9 +159,15 @@ void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
         img_time = timeStep;
     }
 
+    // DEBUG: Log timestamp info
+    RCLCPP_INFO(this->get_logger(), "Processing image with timestamp: %.6f", img_time);
+
     //* Perform all ORB-SLAM3 operations in Monocular mode
     //! Pose with respect to the camera coordinate frame not the world coordinate frame
     Sophus::SE3f Tcw = pAgent->TrackMonocular(cv_ptr->image, img_time); 
+    
+    // DEBUG: Log tracking result
+    RCLCPP_INFO(this->get_logger(), "ORB-SLAM3 tracking completed - Pose matrix computed");
     
     //* An example of what can be done after the pose w.r.t camera coordinate frame is computed by ORB SLAM3
     //Sophus::SE3f Twc = Tcw.inverse(); //* Pose with respect to global image coordinate, reserved for future use

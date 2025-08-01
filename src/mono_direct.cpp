@@ -119,6 +119,10 @@ void MonocularDirectMode::initializeVSLAM(std::string& configString){
     pAgent = new ORB_SLAM3::System(vocFilePath, settingsFilePath, sensorType, enablePangolinWindow);
     RCLCPP_INFO(this->get_logger(), "MonocularDirectMode node initialized with Pangolin viewer: %s", 
                  enablePangolinWindow ? "ENABLED" : "DISABLED");
+    
+    // Initialize OpenCV window for current frame display
+    cv::namedWindow("Current Frame", cv::WINDOW_AUTOSIZE);
+    RCLCPP_INFO(this->get_logger(), "OpenCV window 'Current Frame' initialized");
 }
 
 //* Callback to process image message and run SLAM node
@@ -142,10 +146,17 @@ void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
         // RCLCPP_INFO(this->get_logger(), "Successfully converted image to OpenCV format - Size: %dx%d", 
         //             cv_ptr->image.cols, cv_ptr->image.rows);
         
+        // DEBUG: Check image properties for tracking
+        if (processedImageCount % 30 == 0) { // Log every 30th frame to avoid spam
+            RCLCPP_INFO(this->get_logger(), "Image #%d - Size: %dx%d, Channels: %d, Type: %d", 
+                        processedImageCount, cv_ptr->image.cols, cv_ptr->image.rows, 
+                        cv_ptr->image.channels(), cv_ptr->image.type());
+        }
+        
         // DEBUGGING, Show image
         // Update GUI Window
-        // cv::imshow("test_window", cv_ptr->image);
-        // cv::waitKey(3);
+        cv::imshow("Current Frame", cv_ptr->image);
+        cv::waitKey(1); // Wait 1ms for key press, allows window to update
     }
     catch (cv_bridge::Exception& e)
     {
@@ -170,7 +181,16 @@ void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
     
     // DEBUG: Check tracking state and pose validity
     if (Tcw.log().norm() < 1e-10) {
-        RCLCPP_WARN(this->get_logger(), "ORB-SLAM3: No valid pose computed (identity matrix)");
+        RCLCPP_WARN(this->get_logger(), "ORB-SLAM3: No valid pose computed (identity matrix) - Image #%d", processedImageCount);
+        
+        // Additional debugging for tracking issues
+        if (processedImageCount < 10) {
+            RCLCPP_INFO(this->get_logger(), "ORB-SLAM3: Still initializing... (first 10 frames)");
+        } else if (processedImageCount < 50) {
+            RCLCPP_INFO(this->get_logger(), "ORB-SLAM3: Waiting for sufficient camera motion...");
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "ORB-SLAM3: Tracking failed - possible issues: insufficient features, no motion, or poor image quality");
+        }
     } else {
         RCLCPP_INFO(this->get_logger(), "ORB-SLAM3: Valid pose computed - Translation: [%.3f, %.3f, %.3f]", 
                     Tcw.translation().x(), Tcw.translation().y(), Tcw.translation().z());

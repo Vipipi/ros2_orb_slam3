@@ -59,6 +59,7 @@ class MonocularDirectMode : public rclcpp::Node
     std::string experimentConfig = ""; // String to receive settings sent by the python driver
     double timeStep; // Timestep data received from the python node
     std::string receivedConfig = "";
+    int processedImageCount = 0; // Debug counter for processed images
 
     //* Class constructor
     MonocularDirectMode(); // Constructor 

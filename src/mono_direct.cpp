@@ -117,15 +117,17 @@ void MonocularDirectMode::initializeVSLAM(std::string& configString){
     enableOpenCVWindow = true; // Shows OpenCV window output
     
     pAgent = new ORB_SLAM3::System(vocFilePath, settingsFilePath, sensorType, enablePangolinWindow);
-    std::cout << "MonocularDirectMode node initialized" << std::endl; // TODO needs a better message
+    RCLCPP_INFO(this->get_logger(), "MonocularDirectMode node initialized with Pangolin viewer: %s", 
+                 enablePangolinWindow ? "ENABLED" : "DISABLED");
 }
 
 //* Callback to process image message and run SLAM node
 void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
 {
     // DEBUG: Log message reception
-    RCLCPP_INFO(this->get_logger(), "Received image message - Size: %dx%d, Encoding: %s", 
-                 msg.width, msg.height, msg.encoding.c_str());
+    processedImageCount++;
+    // RCLCPP_INFO(this->get_logger(), "Received image message #%d - Size: %dx%d, Encoding: %s", 
+    //              processedImageCount, msg.width, msg.height, msg.encoding.c_str());
     
     // Initialize
     cv_bridge::CvImagePtr cv_ptr; //* Does not create a copy, memory efficient
@@ -137,8 +139,8 @@ void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
         cv_ptr = cv_bridge::toCvCopy(msg); // Local scope
         
         // DEBUG: Log successful conversion
-        RCLCPP_INFO(this->get_logger(), "Successfully converted image to OpenCV format - Size: %dx%d", 
-                    cv_ptr->image.cols, cv_ptr->image.rows);
+        // RCLCPP_INFO(this->get_logger(), "Successfully converted image to OpenCV format - Size: %dx%d", 
+        //             cv_ptr->image.cols, cv_ptr->image.rows);
         
         // DEBUGGING, Show image
         // Update GUI Window
@@ -160,14 +162,27 @@ void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
     }
 
     // DEBUG: Log timestamp info
-    RCLCPP_INFO(this->get_logger(), "Processing image with timestamp: %.6f", img_time);
+    // RCLCPP_INFO(this->get_logger(), "Processing image with timestamp: %.6f", img_time);
 
     //* Perform all ORB-SLAM3 operations in Monocular mode
     //! Pose with respect to the camera coordinate frame not the world coordinate frame
     Sophus::SE3f Tcw = pAgent->TrackMonocular(cv_ptr->image, img_time); 
     
-    // DEBUG: Log tracking result
-    RCLCPP_INFO(this->get_logger(), "ORB-SLAM3 tracking completed - Pose matrix computed");
+    // DEBUG: Check tracking state and pose validity
+    if (Tcw.log().norm() < 1e-10) {
+        RCLCPP_WARN(this->get_logger(), "ORB-SLAM3: No valid pose computed (identity matrix)");
+    } else {
+        RCLCPP_INFO(this->get_logger(), "ORB-SLAM3: Valid pose computed - Translation: [%.3f, %.3f, %.3f]", 
+                    Tcw.translation().x(), Tcw.translation().y(), Tcw.translation().z());
+    }
+    
+    // DEBUG: Check system state
+    ORB_SLAM3::System::eSensor sensor = pAgent->GetSensor();
+    RCLCPP_INFO(this->get_logger(), "ORB-SLAM3 sensor type: %d", static_cast<int>(sensor));
+    
+    // Force viewer update (if needed)
+    // Note: ORB-SLAM3 viewer updates are typically handled internally
+    // RCLCPP_INFO(this->get_logger(), "ORB-SLAM3 tracking completed - Viewer should be updated");
     
     //* An example of what can be done after the pose w.r.t camera coordinate frame is computed by ORB SLAM3
     //Sophus::SE3f Twc = Tcw.inverse(); //* Pose with respect to global image coordinate, reserved for future use

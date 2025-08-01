@@ -177,8 +177,8 @@ void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
     }
     
     // DEBUG: Check system state
-    ORB_SLAM3::System::eSensor sensor = pAgent->GetSensor();
-    RCLCPP_INFO(this->get_logger(), "ORB-SLAM3 sensor type: %d", static_cast<int>(sensor));
+    // ORB_SLAM3::System::eSensor sensor = pAgent->GetSensor();
+    // RCLCPP_INFO(this->get_logger(), "ORB-SLAM3 sensor type: %d", static_cast<int>(sensor));
     
     // Force viewer update (if needed)
     // Note: ORB-SLAM3 viewer updates are typically handled internally

@@ -143,15 +143,18 @@ void MonocularDirectMode::Img_callback(const sensor_msgs::msg::Image& msg)
         cv_ptr = cv_bridge::toCvCopy(msg); // Local scope
         
         // DEBUG: Log successful conversion
-        // RCLCPP_INFO(this->get_logger(), "Successfully converted image to OpenCV format - Size: %dx%d", 
-        //             cv_ptr->image.cols, cv_ptr->image.rows);
+        RCLCPP_INFO(this->get_logger(), "Successfully converted image to OpenCV format - Size: %dx%d", 
+                    cv_ptr->image.cols, cv_ptr->image.rows);
         
         // DEBUG: Check image properties for tracking
-        if (processedImageCount % 30 == 0) { // Log every 30th frame to avoid spam
-            RCLCPP_INFO(this->get_logger(), "Image #%d - Size: %dx%d, Channels: %d, Type: %d", 
-                        processedImageCount, cv_ptr->image.cols, cv_ptr->image.rows, 
-                        cv_ptr->image.channels(), cv_ptr->image.type());
-        }
+        RCLCPP_INFO(this->get_logger(), "Image #%d - Size: %dx%d, Channels: %d, Type: %d, Encoding: %s", 
+                    processedImageCount, cv_ptr->image.cols, cv_ptr->image.rows, 
+                    cv_ptr->image.channels(), cv_ptr->image.type(), msg.encoding.c_str());
+        
+        // DEBUG: Check if image data is valid (not all black)
+        cv::Scalar meanVal = cv::mean(cv_ptr->image);
+        RCLCPP_INFO(this->get_logger(), "Image #%d - Mean pixel values: B=%.1f, G=%.1f, R=%.1f", 
+                    processedImageCount, meanVal[0], meanVal[1], meanVal[2]);
         
         // DEBUGGING, Show image
         // Update GUI Window

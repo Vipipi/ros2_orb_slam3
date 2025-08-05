@@ -3369,7 +3369,21 @@ void Tracking::CreateNewKeyFrame()
             //Verbose::PrintMess("new mps for stereo KF: " + to_string(nPoints), Verbose::VERBOSITY_NORMAL);
         }
     }
+    // --- INSERT: write out the image for downstream use ---
+    {
+        // grab the frame the SLAM just decided is a keyframe
+        cv::Mat img;
+        if(mSensor == MONOCULAR)
+            img = mCurrentFrame.mIm.clone();       // mono_gray
+        else
+            cv::cvtColor(mCurrentFrame.mImRGB, img, cv::COLOR_BGR2GRAY); // for RGB / stereo
 
+        // use the SLAM-assigned keyframe ID in the filename
+        std::ostringstream ss;
+        ss << "/keyframes/keyframe_" << pKF->mnId << ".png";
+        cv::imwrite(ss.str(), img);
+    }
+    // --- end INSERT ---
 
     mpLocalMapper->InsertKeyFrame(pKF);
 

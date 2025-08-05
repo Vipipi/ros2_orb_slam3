@@ -3370,14 +3370,11 @@ void Tracking::CreateNewKeyFrame()
             //Verbose::PrintMess("new mps for stereo KF: " + to_string(nPoints), Verbose::VERBOSITY_NORMAL);
         }
     }
-    // --- INSERT: write out the image for downstream use ---
-    {
-        cv::Mat img = mCurrentFrame.mImGray.clone();       // mono_gray
-        std::ostringstream ss;
-        ss << "/keyframes/keyframe_" << pKF->mnId << ".png";
-        cv::imwrite(ss.str(), img);
-    }
-    // --- end INSERT ---
+    // --- INSERT: log seq ID and ros time for your RTSM lookup ---
+    std::cout << "[ORB_SLAM3] KeyFrame created:"
+              << " seq_id="   << pKF->mnFrameId
+              << " ros_time=" << std::fixed << pKF->mTimeStamp
+              << std::endl;
 
     mpLocalMapper->InsertKeyFrame(pKF);
 

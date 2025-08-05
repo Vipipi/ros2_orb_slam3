@@ -3372,7 +3372,7 @@ void Tracking::CreateNewKeyFrame()
     }
     // --- INSERT: write out the image for downstream use ---
     {
-        img = mCurrentFrame.mIm.clone();       // mono_gray
+        cv::Mat img = mCurrentFrame.mImGray.clone();       // mono_gray
         std::ostringstream ss;
         ss << "/keyframes/keyframe_" << pKF->mnId << ".png";
         cv::imwrite(ss.str(), img);

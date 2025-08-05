@@ -3372,14 +3372,7 @@ void Tracking::CreateNewKeyFrame()
     }
     // --- INSERT: write out the image for downstream use ---
     {
-        // grab the frame the SLAM just decided is a keyframe
-        cv::Mat img;
-        if(mSensor == MONOCULAR)
-            img = mCurrentFrame.mIm.clone();       // mono_gray
-        else
-            cv::cvtColor(mCurrentFrame.mImRGB, img, cv::COLOR_BGR2GRAY); // for RGB / stereo
-
-        // use the SLAM-assigned keyframe ID in the filename
+        img = mCurrentFrame.mIm.clone();       // mono_gray
         std::ostringstream ss;
         ss << "/keyframes/keyframe_" << pKF->mnId << ".png";
         cv::imwrite(ss.str(), img);

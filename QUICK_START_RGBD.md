@@ -37,7 +37,7 @@ source install/setup.bash
 
 1. **Prepare your dataset**:
    ```
-   TEST_DATASET/sample_tum_rgbd/
+   TEST_DATASET/sample_realsense_rgbd/
    ├── rgb/
    │   ├── 000001.png
    │   ├── 000002.png
@@ -118,7 +118,7 @@ ros2 node info /rgbd_cpp_node
 
 ## Configuration
 
-Edit `orb_slam3/config/RGBD/TUM1.yaml` for your camera:
+Edit `orb_slam3/config/RGBD/realsense.yaml` for your camera:
 
 ```yaml
 # Camera calibration

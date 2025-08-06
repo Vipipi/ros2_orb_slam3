@@ -157,6 +157,11 @@ void RGBDMode::RGBDCallback(const sensor_msgs::msg::Image::ConstSharedPtr& rgb_m
     cv_bridge::CvImagePtr cv_depth_ptr;
     try {
         cv_depth_ptr = cv_bridge::toCvCopy(depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+        
+        // Note: ORB-SLAM3 automatically applies DepthMapFactor (1/1000.0) 
+        // from the configuration file to convert mm to meters
+        // No additional conversion needed here
+        
     } catch (cv_bridge::Exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Error reading depth image");
         return;

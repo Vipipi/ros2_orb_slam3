@@ -195,6 +195,10 @@ class RGBDDriver(Node):
             rgb_msg = self.bridge.cv2_to_imgmsg(rgb_img, "bgr8")
             depth_msg = self.bridge.cv2_to_imgmsg(depth_img, "32FC1")
             
+            # Note: ORB-SLAM3 automatically applies DepthMapFactor (1/1000.0) 
+            # from the configuration file to convert mm to meters
+            # No additional conversion needed here
+            
             # Set synchronized timestamps for D435i compatibility
             current_time = self.get_clock().now()
             rgb_msg.header.stamp = current_time.to_msg()

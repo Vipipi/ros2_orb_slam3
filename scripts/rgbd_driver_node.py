@@ -31,7 +31,7 @@ class RGBDDriver(Node):
         self.image_seq = "sample_realsense_rgbd"  # Change this to match your dataset path
         
         # Path to your dataset
-        self.dataset_path = os.path.expanduser("~/ros2_test/src/ros2_orb_slam3/TEST_DATASET/sample_realsense_rgbd/")
+        self.dataset_path = "/output_images/TEST_DATASET/sample_realsense_rgbd/"
         
         # Topic names
         self.pub_exp_config_name = "/rgbd_py_driver/experiment_settings"

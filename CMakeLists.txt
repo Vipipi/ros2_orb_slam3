@@ -25,6 +25,7 @@ find_package(OpenCV 4.2 REQUIRED)
 find_package(Eigen3 3.3.0 REQUIRED) # Matched with Sophus
 find_package(Pangolin REQUIRED)
 find_package(image_transport REQUIRED)
+find_package(message_filters REQUIRED)
 
 
 # Header file locations [C++ node]
@@ -54,6 +55,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   # your_custom_msg_interface
   cv_bridge
   image_transport
+  message_filters
   OpenCV
   Eigen3
   Pangolin
@@ -162,6 +164,11 @@ add_executable(mono_direct_cpp
   src/mono_direct_example.cpp
 )
 
+add_executable(rgbd_node_cpp
+  src/rgbd_example.cpp
+  src/rgbd_common.cpp
+)
+
 
 ament_target_dependencies(mono_node_cpp
   PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS}
@@ -171,8 +178,13 @@ ament_target_dependencies(mono_direct_cpp
   PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS}
 )
 
+ament_target_dependencies(rgbd_node_cpp
+  PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
+
 target_link_libraries(mono_node_cpp PUBLIC orb_slam3_lib) # Link a node with the internal shared library
 target_link_libraries(mono_direct_cpp PUBLIC orb_slam3_lib) # Link a node with the internal shared library
+target_link_libraries(rgbd_node_cpp PUBLIC orb_slam3_lib) # Link a node with the internal shared library
 
 
 # Install all the header files in package/package/include
@@ -181,7 +193,7 @@ install (DIRECTORY include/
 )
 
 # Install our nodes and library
-install(TARGETS mono_node_cpp mono_direct_cpp orb_slam3_lib
+install(TARGETS mono_node_cpp mono_direct_cpp rgbd_node_cpp orb_slam3_lib
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -205,6 +217,7 @@ ament_python_install_package(${PROJECT_NAME}) # Install the modules in ros2_orb_
 # Install Python executables
 install(PROGRAMS
   scripts/mono_driver_node.py
+  scripts/rgbd_driver_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

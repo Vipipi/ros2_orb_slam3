@@ -24,6 +24,11 @@
 #include "sensor_msgs/msg/image.hpp"
 using std::placeholders::_1;
 
+// Message filters includes
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
 // Include Eigen
 #include <Eigen/Dense>
 
@@ -77,9 +82,16 @@ class RGBDMode : public rclcpp::Node
         // Definitions of publisher and subscribers
         rclcpp::Subscription<std_msgs::msg::String>::SharedPtr expConfig_subscription_;
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr configAck_publisher_;
-        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subRGBImgMsg_subscription_;
-        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subDepthImgMsg_subscription_;
         rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr subTimestepMsg_subscription_;
+
+        // Message filter subscribers for synchronized RGB-D
+        message_filters::Subscriber<sensor_msgs::msg::Image> rgb_sub_;
+        message_filters::Subscriber<sensor_msgs::msg::Image> depth_sub_;
+        
+        // Synchronizer
+        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image> approximate_sync_policy;
+        typedef message_filters::Synchronizer<approximate_sync_policy> Sync;
+        std::shared_ptr<Sync> sync_;
 
         // ORB_SLAM3 related variables
         ORB_SLAM3::System* pAgent; // pointer to a ORB SLAM3 object
@@ -90,13 +102,12 @@ class RGBDMode : public rclcpp::Node
         // ROS callbacks
         void experimentSetting_callback(const std_msgs::msg::String& msg); // Callback to process settings sent over by Python node
         void Timestep_callback(const std_msgs::msg::Float64& time_msg); // Callback to process the timestep for this image
-        void RGBImg_callback(const sensor_msgs::msg::Image& msg); // Callback to process RGB image
-        void DepthImg_callback(const sensor_msgs::msg::Image& msg); // Callback to process depth image
+        void RGBDCallback(const sensor_msgs::msg::Image::ConstSharedPtr& rgb_msg, const sensor_msgs::msg::Image::ConstSharedPtr& depth_msg); // Synchronized RGB-D callback
         
         // Helper functions
         void initializeVSLAM(std::string& configString); // Method to bind an initialized VSLAM framework to this node
 
-        // RGB-D specific variables
+        // Legacy RGB-D specific variables (kept for backward compatibility)
         cv::Mat lastRGBImage;
         cv::Mat lastDepthImage;
         bool rgbImageReceived = false;

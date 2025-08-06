@@ -12,6 +12,9 @@ REQUIREMENTS
 
 // Includes
 #include "ros2_orb_slam3/rgbd_common.hpp"
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
 
 // Constructor
 RGBDMode::RGBDMode() :Node("rgbd_node_cpp")
@@ -64,11 +67,13 @@ RGBDMode::RGBDMode() :Node("rgbd_node_cpp")
     // publisher to send out acknowledgement
     configAck_publisher_ = this->create_publisher<std_msgs::msg::String>(pubconfigackName, 10);
 
-    // subscribe to the RGB image messages coming from the Python driver node
-    subRGBImgMsg_subscription_= this->create_subscription<sensor_msgs::msg::Image>(subRGBImgMsgName, 1, std::bind(&RGBDMode::RGBImg_callback, this, _1));
-
-    // subscribe to the depth image messages coming from the Python driver node
-    subDepthImgMsg_subscription_= this->create_subscription<sensor_msgs::msg::Image>(subDepthImgMsgName, 1, std::bind(&RGBDMode::DepthImg_callback, this, _1));
+    // Setup message filters for synchronized RGB-D
+    rgb_sub_.subscribe(this, subRGBImgMsgName);
+    depth_sub_.subscribe(this, subDepthImgMsgName);
+    
+    // Create synchronizer with 10-frame queue and 0.1s time tolerance
+    sync_ = std::make_shared<Sync>(approximate_sync_policy(10), rgb_sub_, depth_sub_);
+    sync_->registerCallback(std::bind(&RGBDMode::RGBDCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     // subscribe to receive the timestep
     subTimestepMsg_subscription_= this->create_subscription<std_msgs::msg::Float64>(subTimestepMsgName, 1, std::bind(&RGBDMode::Timestep_callback, this, _1));
@@ -136,74 +141,35 @@ void RGBDMode::Timestep_callback(const std_msgs::msg::Float64& time_msg){
     timeStep = time_msg.data;
 }
 
-// Callback to process RGB image message
-void RGBDMode::RGBImg_callback(const sensor_msgs::msg::Image& msg)
-{
-    // Initialize
-    cv_bridge::CvImagePtr cv_ptr;
-    
-    // Convert ROS image to openCV image
-    try
-    {
-        cv_ptr = cv_bridge::toCvCopy(msg);
-    }
-    catch (cv_bridge::Exception& e)
-    {
-        RCLCPP_ERROR(this->get_logger(),"Error reading RGB image");
+// Synchronized RGB-D callback using message filters
+void RGBDMode::RGBDCallback(const sensor_msgs::msg::Image::ConstSharedPtr& rgb_msg,
+                           const sensor_msgs::msg::Image::ConstSharedPtr& depth_msg) {
+    // Convert RGB image
+    cv_bridge::CvImagePtr cv_rgb_ptr;
+    try {
+        cv_rgb_ptr = cv_bridge::toCvCopy(rgb_msg);
+    } catch (cv_bridge::Exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "Error reading RGB image");
         return;
     }
     
-    // Store RGB image
-    {
-        std::lock_guard<std::mutex> lock(imageMutex);
-        lastRGBImage = cv_ptr->image.clone();
-        rgbImageReceived = true;
-    }
-    
-    // Process if both images are available
-    processRGBDImages();
-}
-
-// Callback to process depth image message
-void RGBDMode::DepthImg_callback(const sensor_msgs::msg::Image& msg)
-{
-    // Initialize
-    cv_bridge::CvImagePtr cv_ptr;
-    
-    // Convert ROS image to openCV image
-    try
-    {
-        cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_32FC1);
-    }
-    catch (cv_bridge::Exception& e)
-    {
-        RCLCPP_ERROR(this->get_logger(),"Error reading depth image");
+    // Convert depth image
+    cv_bridge::CvImagePtr cv_depth_ptr;
+    try {
+        cv_depth_ptr = cv_bridge::toCvCopy(depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+    } catch (cv_bridge::Exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "Error reading depth image");
         return;
     }
     
-    // Store depth image
-    {
-        std::lock_guard<std::mutex> lock(imageMutex);
-        lastDepthImage = cv_ptr->image.clone();
-        depthImageReceived = true;
-    }
+    // Process synchronized pair directly
+    Sophus::SE3f Tcw = pAgent->TrackRGBD(cv_rgb_ptr->image, cv_depth_ptr->image, timeStep);
     
-    // Process if both images are available
-    processRGBDImages();
-}
-
-// Process synchronized RGB-D images
-void RGBDMode::processRGBDImages()
-{
-    std::lock_guard<std::mutex> lock(imageMutex);
-    
-    if (rgbImageReceived && depthImageReceived)
-    {
-        // Perform all ORB-SLAM3 operations in RGB-D mode
-        Sophus::SE3f Tcw = pAgent->TrackRGBD(lastRGBImage, lastDepthImage, timeStep);
-        
-        // Reset flags for next frame
-        rgbImageReceived = false;
-        depthImageReceived = false;
+    // Debug output for tracking status
+    if (Tcw.log().norm() < 1e-10) {
+        RCLCPP_WARN(this->get_logger(), "ORB-SLAM3 RGB-D: No valid pose computed");
+    } else {
+        RCLCPP_INFO(this->get_logger(), "ORB-SLAM3 RGB-D: Valid pose computed - Translation: [%.3f, %.3f, %.3f]", 
+                    Tcw.translation().x(), Tcw.translation().y(), Tcw.translation().z());
     }
 } 

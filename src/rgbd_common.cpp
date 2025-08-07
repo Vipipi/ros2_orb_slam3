@@ -121,10 +121,9 @@ void RGBDMode::initializeVSLAM(std::string& configString){
     } 
     
     // Build .yaml file path
-    settingsFilePath = settingsFilePath.append(configString);
-    settingsFilePath = settingsFilePath.append(".yaml"); // Example ros2_ws/src/orb_slam3_ros2/orb_slam3/config/RGBD/TUM1.yaml
-
-    RCLCPP_INFO(this->get_logger(), "Path to settings file: %s", settingsFilePath.c_str());
+    std::string fullSettingsPath = settingsFilePath + configString + ".yaml";
+    
+    RCLCPP_INFO(this->get_logger(), "Path to settings file: %s", fullSettingsPath.c_str());
     
     // NOTE if you plan on passing other configuration parameters to ORB SLAM3 Systems class, do it here
     // NOTE you may also use a .yaml file here to set these values
@@ -132,7 +131,7 @@ void RGBDMode::initializeVSLAM(std::string& configString){
     enablePangolinWindow = true; // Shows Pangolin window output
     enableOpenCVWindow = true; // Shows OpenCV window output
     
-    pAgent = new ORB_SLAM3::System(vocFilePath, settingsFilePath, sensorType, enablePangolinWindow);
+    pAgent = new ORB_SLAM3::System(vocFilePath, fullSettingsPath, sensorType, enablePangolinWindow);
     std::cout << "RGBDMode node initialized" << std::endl;
 }
 

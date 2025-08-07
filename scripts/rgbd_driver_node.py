@@ -33,6 +33,10 @@ class RGBDDriver(Node):
         # Path to your dataset
         self.dataset_path = "/output_images/TEST_DATASET/sample_realsense_rgbd/"
         
+        # Publishing configuration
+        self.use_timestamp_based_publishing = True  # Set to False for fixed rate
+        self.fixed_publish_rate = 30.0  # Hz (only used if timestamp-based is False)
+        
         # Topic names
         self.pub_exp_config_name = "/rgbd_py_driver/experiment_settings"
         self.sub_exp_ack_name = "/rgbd_py_driver/exp_settings_ack"
@@ -84,9 +88,16 @@ class RGBDDriver(Node):
         # Load dataset
         self.load_dataset()
         
-        # Start the main loop
-        self.timer = self.create_timer(0.033, self.main_loop)  # ~30 FPS
-        
+        # Start the main loop with appropriate timing
+        if self.use_timestamp_based_publishing:
+            # Use timestamp-based timing for accurate replay
+            self.last_publish_time = 0.0
+            self.timer = self.create_timer(0.001, self.main_loop)  # High frequency timer for precise timing
+        else:
+            # Use fixed rate timing
+            timer_period = 1.0 / self.fixed_publish_rate
+            self.timer = self.create_timer(timer_period, self.main_loop)
+    
     def load_dataset(self):
         """Load RGB and depth images from dataset with timestamp-based synchronization"""
         try:
@@ -172,7 +183,7 @@ class RGBDDriver(Node):
             print("Handshake completed! Starting to send images...")
     
     def main_loop(self):
-        """Main loop to send RGB-D images"""
+        """Main loop to send RGB-D images with configurable timing"""
         if self.send_config:
             # Send configuration
             config_msg = String()
@@ -185,6 +196,30 @@ class RGBDDriver(Node):
             print("Dataset finished")
             return
         
+        if self.use_timestamp_based_publishing:
+            # Timestamp-based publishing
+            current_time = self.get_clock().now().nanoseconds / 1e9  # Convert to seconds
+            
+            # Check if it's time to publish the next frame based on dataset timestamps
+            if self.current_frame_idx < len(self.timestamps):
+                target_timestamp = self.timestamps[self.current_frame_idx]
+                
+                # Calculate time since start (assuming first frame at t=0)
+                if self.current_frame_idx == 0:
+                    self.start_time = current_time
+                    time_since_start = 0.0
+                else:
+                    time_since_start = current_time - self.start_time
+                
+                # Check if we should publish this frame
+                if time_since_start >= target_timestamp - self.timestamps[0]:
+                    self._publish_current_frame()
+        else:
+            # Fixed rate publishing
+            self._publish_current_frame()
+    
+    def _publish_current_frame(self):
+        """Helper method to publish the current frame"""
         # Get current frame
         rgb_img = self.rgb_images[self.current_frame_idx]
         depth_img = self.depth_images[self.current_frame_idx]
@@ -209,9 +244,9 @@ class RGBDDriver(Node):
             # No additional conversion needed here
             
             # Set synchronized timestamps for D435i compatibility
-            current_time = self.get_clock().now()
-            rgb_msg.header.stamp = current_time.to_msg()
-            depth_msg.header.stamp = current_time.to_msg()
+            current_ros_time = self.get_clock().now()
+            rgb_msg.header.stamp = current_ros_time.to_msg()
+            depth_msg.header.stamp = current_ros_time.to_msg()
             
             # Set frame IDs for proper TF tree
             rgb_msg.header.frame_id = "camera_color_optical_frame"
@@ -226,7 +261,13 @@ class RGBDDriver(Node):
             timestamp_msg.data = timestamp
             self.publish_timestep_msg_.publish(timestamp_msg)
             
-            print(f"Published synchronized frame {self.current_frame_idx + 1}/{len(self.rgb_images)}")
+            if self.use_timestamp_based_publishing:
+                current_time = self.get_clock().now().nanoseconds / 1e9
+                time_since_start = current_time - self.start_time
+                target_timestamp = self.timestamps[self.current_frame_idx]
+                print(f"Published frame {self.current_frame_idx + 1}/{len(self.rgb_images)} at {time_since_start:.3f}s (target: {target_timestamp - self.timestamps[0]:.3f}s)")
+            else:
+                print(f"Published frame {self.current_frame_idx + 1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz")
             
             # Show images if enabled
             if self.show_imgz:

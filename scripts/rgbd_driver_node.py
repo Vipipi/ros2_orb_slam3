@@ -34,7 +34,7 @@ class RGBDDriver(Node):
         self.dataset_path = "/output_images/TEST_DATASET/sample_realsense_rgbd/"
         
         # Publishing configuration
-        self.use_timestamp_based_publishing = True  # Set to False for fixed rate
+        self.use_timestamp_based_publishing = False  # Set to False for constant frame rate
         self.fixed_publish_rate = 30.0  # Hz (only used if timestamp-based is False)
         
         # Topic names
@@ -88,15 +88,10 @@ class RGBDDriver(Node):
         # Load dataset
         self.load_dataset()
         
-        # Start the main loop with appropriate timing
-        if self.use_timestamp_based_publishing:
-            # Use timestamp-based timing for accurate replay
-            self.last_publish_time = 0.0
-            self.timer = self.create_timer(0.001, self.main_loop)  # High frequency timer for precise timing
-        else:
-            # Use fixed rate timing
-            timer_period = 1.0 / self.fixed_publish_rate
-            self.timer = self.create_timer(timer_period, self.main_loop)
+        # Start the main loop with fixed rate timing for constant frame rate
+        timer_period = 1.0 / self.fixed_publish_rate  # 1/30 = 0.033 seconds
+        self.timer = self.create_timer(timer_period, self.main_loop)
+        print(f"Starting RGB-D driver at {self.fixed_publish_rate}Hz ({timer_period:.3f}s interval)")
     
     def load_dataset(self):
         """Load RGB and depth images from dataset with timestamp-based synchronization"""
@@ -183,7 +178,7 @@ class RGBDDriver(Node):
             print("Handshake completed! Starting to send images...")
     
     def main_loop(self):
-        """Main loop to send RGB-D images with configurable timing"""
+        """Main loop to send RGB-D images with constant frame rate"""
         if self.send_config:
             # Send configuration
             config_msg = String()
@@ -196,27 +191,8 @@ class RGBDDriver(Node):
             print("Dataset finished")
             return
         
-        if self.use_timestamp_based_publishing:
-            # Timestamp-based publishing
-            current_time = self.get_clock().now().nanoseconds / 1e9  # Convert to seconds
-            
-            # Check if it's time to publish the next frame based on dataset timestamps
-            if self.current_frame_idx < len(self.timestamps):
-                target_timestamp = self.timestamps[self.current_frame_idx]
-                
-                # Calculate time since start (assuming first frame at t=0)
-                if self.current_frame_idx == 0:
-                    self.start_time = current_time
-                    time_since_start = 0.0
-                else:
-                    time_since_start = current_time - self.start_time
-                
-                # Check if we should publish this frame
-                if time_since_start >= target_timestamp - self.timestamps[0]:
-                    self._publish_current_frame()
-        else:
-            # Fixed rate publishing
-            self._publish_current_frame()
+        # Publish current frame at fixed rate
+        self._publish_current_frame()
     
     def _publish_current_frame(self):
         """Helper method to publish the current frame"""
@@ -261,13 +237,7 @@ class RGBDDriver(Node):
             timestamp_msg.data = timestamp
             self.publish_timestep_msg_.publish(timestamp_msg)
             
-            if self.use_timestamp_based_publishing:
-                current_time = self.get_clock().now().nanoseconds / 1e9
-                time_since_start = current_time - self.start_time
-                target_timestamp = self.timestamps[self.current_frame_idx]
-                print(f"Published frame {self.current_frame_idx + 1}/{len(self.rgb_images)} at {time_since_start:.3f}s (target: {target_timestamp - self.timestamps[0]:.3f}s)")
-            else:
-                print(f"Published frame {self.current_frame_idx + 1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz")
+            print(f"Published frame {self.current_frame_idx + 1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz")
             
             # Show images if enabled
             if self.show_imgz:

@@ -44,6 +44,10 @@ RGBD.DepthMapFactor: 1000.0
 # D435i has good depth range, so we can use a wider threshold
 Stereo.ThDepth: 40.0
 
+# Stereo baseline (required for RGB-D mode)
+# For D435i, this is the baseline between RGB and depth cameras
+Stereo.b: 0.05
+
 #--------------------------------------------------------------------------------------------
 # ORB Parameters (optimized for D435i)
 #--------------------------------------------------------------------------------------------

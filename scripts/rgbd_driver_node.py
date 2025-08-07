@@ -193,7 +193,16 @@ class RGBDDriver(Node):
         # Convert images to ROS messages
         try:
             rgb_msg = self.bridge.cv2_to_imgmsg(rgb_img, "bgr8")
-            depth_msg = self.bridge.cv2_to_imgmsg(depth_img, "32FC1")
+            
+            # Handle depth image encoding properly
+            # D435i depth images are typically 16UC1 (uint16), convert to 32FC1 (float32)
+            if depth_img.dtype == np.uint16:
+                # Convert uint16 to float32 and scale from mm to meters
+                depth_img_float = depth_img.astype(np.float32) / 1000.0
+                depth_msg = self.bridge.cv2_to_imgmsg(depth_img_float, "32FC1")
+            else:
+                # If already float32, use as is
+                depth_msg = self.bridge.cv2_to_imgmsg(depth_img, "32FC1")
             
             # Note: ORB-SLAM3 automatically applies DepthMapFactor (1/1000.0) 
             # from the configuration file to convert mm to meters
@@ -229,6 +238,8 @@ class RGBDDriver(Node):
             
         except Exception as e:
             print(f"Error publishing frame {self.current_frame_idx}: {e}")
+            import traceback
+            traceback.print_exc()
 
 def main(args=None):
     rclpy.init(args=args)

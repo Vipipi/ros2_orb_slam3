@@ -38,7 +38,7 @@ class RGBDDriver(Node):
         self.declare_parameter('fixed_publish_rate', float(self.fixed_publish_rate))
         self.declare_parameter('show_imgz', False)
         self.declare_parameter('sync_tolerance_sec', 0.02)  # 20 ms default tolerance
-        self.declare_parameter('skip_handshake', False)
+        self.declare_parameter('skip_handshake', True)
         
         # Override defaults from parameters
         self.settings_name = str(self.get_parameter('settings_name').value)
@@ -235,7 +235,11 @@ def main(args=None):
             rate_handshake.sleep()
         print("Handshake complete")
     else:
-        print("Skipping handshake as requested. Starting stream...")
+        # Send config once (like mono) and start
+        msg = String()
+        msg.data = node.exp_config_msg
+        node.publish_exp_config_.publish(msg)
+        print("Skipping handshake: sent single config message and starting stream...")
 
     # Streaming loop at fixed rate
     rate_stream = node.create_rate(node.fixed_publish_rate)

@@ -18,6 +18,7 @@ import numpy as np
 import os
 import sys
 from cv_bridge import CvBridge
+from rclpy.clock import Clock, ClockType
 
 class RGBDDriver(Node):
     def __init__(self, node_name="rgbd_py_node"):
@@ -252,7 +253,9 @@ def main(args=None):
         print("Skipping handshake: sent single config message and starting stream...")
 
     # Streaming loop at fixed rate
-    rate_stream = node.create_rate(node.fixed_publish_rate)
+    wall_clock = Clock(clock_type=ClockType.SYSTEM_TIME)
+    from rclpy.rate import Rate
+    rate_stream = Rate(node.fixed_publish_rate, wall_clock)
     tick = 0
     try:
         while rclpy.ok():

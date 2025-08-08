@@ -88,10 +88,8 @@ class RGBDDriver(Node):
         # Load dataset
         self.load_dataset()
         
-        # Start the main loop with fixed rate timing for constant frame rate
-        timer_period = 1.0 / self.fixed_publish_rate  # 1/30 = 0.033 seconds
-        self.timer = self.create_timer(timer_period, self.main_loop)
-        print(f"Starting RGB-D driver at {self.fixed_publish_rate}Hz ({timer_period:.3f}s interval)")
+        # Not using timers; publishing is driven by a rate-controlled loop in main()
+        print(f"RGB-D driver ready. Target publish rate: {self.fixed_publish_rate} Hz")
     
     def load_dataset(self):
         """Load RGB and depth images from dataset with timestamp-based synchronization"""
@@ -177,85 +175,74 @@ class RGBDDriver(Node):
             self.send_config = False
             print("Handshake completed! Starting to send images...")
     
-    def main_loop(self):
-        """Main loop to send RGB-D images with constant frame rate"""
-        if self.send_config:
-            # Send configuration
-            config_msg = String()
-            config_msg.data = self.exp_config_msg
-            self.publish_exp_config_.publish(config_msg)
-            print(f"Sent config: {config_msg.data}")
-            return
-        
+    def publish_next_frame(self):
+        """Publish the next RGB-D frame and associated timestamp."""
         if self.current_frame_idx >= len(self.rgb_images):
-            print("Dataset finished")
-            return
+            return False
         
-        # Publish current frame at fixed rate
-        self._publish_current_frame()
-    
-    def _publish_current_frame(self):
-        """Helper method to publish the current frame"""
-        # Get current frame
         rgb_img = self.rgb_images[self.current_frame_idx]
         depth_img = self.depth_images[self.current_frame_idx]
         timestamp = self.timestamps[self.current_frame_idx]
         
-        # Convert images to ROS messages
         try:
             rgb_msg = self.bridge.cv2_to_imgmsg(rgb_img, "bgr8")
             
-            # Handle depth image encoding properly
-            # D435i depth images are typically 16UC1 (uint16), convert to 32FC1 (float32)
+            # Depth: convert 16UC1 (mm) -> 32FC1 (meters)
             if depth_img.dtype == np.uint16:
-                # Convert uint16 to float32 and scale from mm to meters
                 depth_img_float = depth_img.astype(np.float32) / 1000.0
                 depth_msg = self.bridge.cv2_to_imgmsg(depth_img_float, "32FC1")
             else:
-                # If already float32, use as is
                 depth_msg = self.bridge.cv2_to_imgmsg(depth_img, "32FC1")
             
-            # Note: ORB-SLAM3 automatically applies DepthMapFactor (1/1000.0) 
-            # from the configuration file to convert mm to meters
-            # No additional conversion needed here
-            
-            # Set synchronized timestamps for D435i compatibility
-            current_ros_time = self.get_clock().now()
-            rgb_msg.header.stamp = current_ros_time.to_msg()
-            depth_msg.header.stamp = current_ros_time.to_msg()
-            
-            # Set frame IDs for proper TF tree
+            now = self.get_clock().now()
+            rgb_msg.header.stamp = now.to_msg()
+            depth_msg.header.stamp = now.to_msg()
             rgb_msg.header.frame_id = "camera_color_optical_frame"
             depth_msg.header.frame_id = "camera_depth_optical_frame"
             
-            # Publish images with minimal delay between them
             self.publish_rgb_img_.publish(rgb_msg)
             self.publish_depth_img_.publish(depth_msg)
             
-            # Publish timestamp
-            timestamp_msg = Float64()
-            timestamp_msg.data = timestamp
-            self.publish_timestep_msg_.publish(timestamp_msg)
-            
-            print(f"Published frame {self.current_frame_idx + 1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz")
-            
-            # Show images if enabled
-            if self.show_imgz:
-                cv2.imshow("RGB Image", rgb_img)
-                cv2.imshow("Depth Image", depth_img)
-                cv2.waitKey(1)
+            ts_msg = Float64()
+            ts_msg.data = float(timestamp)
+            self.publish_timestep_msg_.publish(ts_msg)
             
             self.current_frame_idx += 1
-            
+            return True
         except Exception as e:
             print(f"Error publishing frame {self.current_frame_idx}: {e}")
             import traceback
             traceback.print_exc()
+            return False
 
 def main(args=None):
     rclpy.init(args=args)
     node = RGBDDriver()
-    rclpy.spin(node)
+
+    # Handshake loop
+    rate_handshake = node.create_rate(20)
+    while node.send_config:
+        # Send configuration once per cycle until ACK
+        msg = String()
+        msg.data = node.exp_config_msg
+        node.publish_exp_config_.publish(msg)
+        rclpy.spin_once(node, timeout_sec=0.0)
+        rate_handshake.sleep()
+
+    print("Handshake complete")
+
+    # Streaming loop at fixed rate
+    rate_stream = node.create_rate(node.fixed_publish_rate)
+    try:
+        while rclpy.ok():
+            if not node.publish_next_frame():
+                print("Dataset finished")
+                break
+            rclpy.spin_once(node, timeout_sec=0.0)
+            rate_stream.sleep()
+    except KeyboardInterrupt:
+        pass
+
     node.destroy_node()
     rclpy.shutdown()
 

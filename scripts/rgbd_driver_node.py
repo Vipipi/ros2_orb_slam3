@@ -104,6 +104,16 @@ class RGBDDriver(Node):
         
         # Not using timers; publishing is driven by a rate-controlled loop in main()
         print(f"RGB-D driver ready. Target publish rate: {self.fixed_publish_rate} Hz")
+    def handshake_with_cpp_node(self):
+        """
+            Send and receive acknowledge of sent configuration settings
+        """
+        if (self.send_config == True):
+            # print(f"Sent mesasge: {self.exp_config_msg}")
+            msg = String()
+            msg.data = self.exp_config_msg
+            self.publish_exp_config_.publish(msg)
+            time.sleep(0.01)
     
     def load_dataset(self):
         """Load RGB and depth images from dataset with timestamp-based synchronization"""
@@ -247,14 +257,12 @@ def main(args=None):
     # Handshake loop (optional)
     if node.skip_handshake:
         while node.send_config:
-            msg = String()
-            msg.data = node.exp_config_msg
-            node.publish_exp_config_.publish(msg)
+            node.handshake_with_cpp_node()
             rclpy.spin_once(node, timeout_sec=0.0)
-            rate_handshake.sleep()
             if node.send_config == False:
                 break
         print("Handshake complete")
+        
     # Streaming loop at fixed rate
     for _ in range(min(len(node.rgb_images), len(node.depth_images))):
         try:

@@ -175,16 +175,14 @@ class RGBDDriver(Node):
             traceback.print_exc()
     
     def ack_callback(self, msg):
-        """Callback for acknowledgement from C++ node"""
-        if msg.data == "ACK":
-            if self.skip_handshake:
-                # Ignore ACK when skipping handshake; do not alter flow
-                if self.debug_logging:
-                    print("[DEBUG] ACK received but skip_handshake=True; ignoring.", flush=True)
-                return
-            print("Received ACK from C++ node")
+        """
+            Callback function
+        """
+        print(f"Got ack: {msg.data}")
+        
+        if(msg.data == "ACK"):
             self.send_config = False
-            print("Handshake completed! Starting to send images...")
+            # self.subscribe_exp_ack_.destory() # TODO doesn't work 
     
     def publish_next_frame(self):
         """Publish the next RGB-D frame and associated timestamp."""

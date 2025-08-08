@@ -39,6 +39,7 @@ class RGBDDriver(Node):
         self.declare_parameter('show_imgz', False)
         self.declare_parameter('sync_tolerance_sec', 0.02)  # 20 ms default tolerance
         self.declare_parameter('skip_handshake', True)
+        self.declare_parameter('debug_logging', True)
         
         # Override defaults from parameters
         self.settings_name = str(self.get_parameter('settings_name').value)
@@ -47,6 +48,7 @@ class RGBDDriver(Node):
         self.show_imgz = bool(self.get_parameter('show_imgz').value)
         self.sync_tolerance_sec = float(self.get_parameter('sync_tolerance_sec').value)
         self.skip_handshake = bool(self.get_parameter('skip_handshake').value)
+        self.debug_logging = bool(self.get_parameter('debug_logging').value)
         
         # Topic names
         self.pub_exp_config_name = "/rgbd_py_driver/experiment_settings"
@@ -177,6 +179,9 @@ class RGBDDriver(Node):
         timestamp = self.timestamps[self.current_frame_idx]
         
         try:
+            if self.debug_logging:
+                print(f"[DEBUG] Preparing frame {self.current_frame_idx+1}/{len(self.rgb_images)} | rgb: {None if rgb_img is None else rgb_img.shape} | depth: {None if depth_img is None else depth_img.shape} | ts: {timestamp:.6f}", flush=True)
+
             rgb_msg = self.bridge.cv2_to_imgmsg(rgb_img, "bgr8")
             
             # Depth: convert 16UC1 (mm) -> 32FC1 (meters)
@@ -199,6 +204,9 @@ class RGBDDriver(Node):
             ts_msg.data = float(timestamp)
             self.publish_timestep_msg_.publish(ts_msg)
             
+            if self.debug_logging:
+                print(f"[DEBUG] Published frame {self.current_frame_idx+1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz | stamp: {now.nanoseconds/1e9:.6f}", flush=True)
+
             self.current_frame_idx += 1
             return True
         except Exception as e:

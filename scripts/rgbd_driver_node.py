@@ -202,13 +202,19 @@ class RGBDDriver(Node):
             depth_msg.header.stamp = now.to_msg()
             rgb_msg.header.frame_id = "camera_color_optical_frame"
             depth_msg.header.frame_id = "camera_depth_optical_frame"
-            
-            self.publish_rgb_img_.publish(rgb_msg)
-            self.publish_depth_img_.publish(depth_msg)
-            
             ts_msg = Float64()
             ts_msg.data = float(timestamp)
-            self.publish_timestep_msg_.publish(ts_msg)
+
+            try:
+                self.publish_rgb_img_.publish(rgb_msg)
+                self.publish_depth_img_.publish(depth_msg)
+                self.publish_timestep_msg_.publish(ts_msg)
+            except Exception as e:
+                print(f"Error publishing images: {e}")
+                import traceback
+                traceback.print_exc()
+                return False
+            
             
             if self.debug_logging:
                 print(f"[DEBUG] Published frame {self.current_frame_idx+1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz | stamp: {now.nanoseconds/1e9:.6f}", flush=True)
@@ -239,26 +245,20 @@ def main(args=None):
         return
 
     # Handshake loop (optional)
-    if not node.skip_handshake:
-        print("Waiting for C++ node ACK (set -p skip_handshake:=true to skip)...")
-        rate_handshake = node.create_rate(20)
+    if node.skip_handshake:
         while node.send_config:
             msg = String()
             msg.data = node.exp_config_msg
             node.publish_exp_config_.publish(msg)
             rclpy.spin_once(node, timeout_sec=0.0)
             rate_handshake.sleep()
+            if node.send_config == False:
+                break
         print("Handshake complete")
-    else:
-        # Send config once (like mono) and start
-        msg = String()
-        msg.data = node.exp_config_msg
-        node.publish_exp_config_.publish(msg)
-        print("Skipping handshake: sent single config message and starting stream...")
-
     # Streaming loop at fixed rate
     for _ in range(min(len(node.rgb_images), len(node.depth_images))):
-        rclpy.spin_once(node, timeout_sec=0.0)
+        try:
+            rclpy.spin_once(node, timeout_sec=0.0)
         if not node.publish_next_frame():
             break
         rate.sleep()

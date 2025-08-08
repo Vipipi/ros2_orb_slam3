@@ -253,13 +253,17 @@ def main(args=None):
 
     # Streaming loop at fixed rate
     rate_stream = node.create_rate(node.fixed_publish_rate)
+    tick = 0
     try:
         while rclpy.ok():
-            if not node.publish_next_frame():
-                print("Dataset finished")
-                break
             rclpy.spin_once(node, timeout_sec=0.0)
+            if node.debug_logging and (tick % 10 == 0):
+                print(f"[DEBUG] Loop tick={tick}, idx={node.current_frame_idx}/{len(node.rgb_images)}", flush=True)
+            if not node.publish_next_frame():
+                print("Dataset finished", flush=True)
+                break
             rate_stream.sleep()
+            tick += 1
     except KeyboardInterrupt:
         pass
 

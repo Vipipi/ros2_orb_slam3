@@ -211,19 +211,20 @@ class RGBDDriver(Node):
             depth_msg.header.stamp = now.to_msg()
             rgb_msg.header.frame_id = "camera_color_optical_frame"
             depth_msg.header.frame_id = "camera_depth_optical_frame"
+            
+            # Publish timestep FIRST, then images (matches mono driver flow)
             ts_msg = Float64()
             ts_msg.data = float(timestamp)
-
+            
             try:
+                self.publish_timestep_msg_.publish(ts_msg)
                 self.publish_rgb_img_.publish(rgb_msg)
                 self.publish_depth_img_.publish(depth_msg)
-                self.publish_timestep_msg_.publish(ts_msg)
             except Exception as e:
                 print(f"Error publishing images: {e}")
                 import traceback
                 traceback.print_exc()
                 return False
-            
             
             if self.debug_logging:
                 print(f"[DEBUG] Published frame {self.current_frame_idx+1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz | stamp: {now.nanoseconds/1e9:.6f}", flush=True)
@@ -239,7 +240,6 @@ class RGBDDriver(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = RGBDDriver("rgbd_py_node")
-    rate = node.create_rate(node.fixed_publish_rate)
 
     if len(node.rgb_images) == 0 or len(node.depth_images) == 0:
         print("❌ No images loaded. Check dataset_path and folder structure (rgb/ and depth/).")
@@ -254,23 +254,36 @@ def main(args=None):
         return
 
     # Handshake loop (optional)
-    if node.skip_handshake:
+    if not node.skip_handshake:
+        print("Waiting for C++ node ACK (set -p skip_handshake:=true to skip)...")
         while node.send_config:
-            node.handshake_with_cpp_node()
+            msg = String()
+            msg.data = node.exp_config_msg
+            node.publish_exp_config_.publish(msg)
             rclpy.spin_once(node, timeout_sec=0.0)
-            if node.send_config == False:
-                break
+            time.sleep(0.05)
         print("Handshake complete")
+    else:
+        # Send config once (like mono) and start
+        msg = String()
+        msg.data = node.exp_config_msg
+        node.publish_exp_config_.publish(msg)
+        print("Skipping handshake: sent single config message and starting stream...")
 
-    # Streaming loop at fixed rate
-    for _ in range(min(len(node.rgb_images), len(node.depth_images))):
-        try:
+    # Streaming loop at fixed wall-clock rate
+    period_s = 1.0 / float(node.fixed_publish_rate)
+    tick = 0
+    try:
+        while node.current_frame_idx < len(node.rgb_images):
             rclpy.spin_once(node, timeout_sec=0.0)
+            if node.debug_logging and (tick % 10 == 0):
+                print(f"[DEBUG] Tick {tick} idx={node.current_frame_idx}/{len(node.rgb_images)}", flush=True)
             if not node.publish_next_frame():
                 break
-            rate.sleep()
-        except KeyboardInterrupt:
-            break
+            time.sleep(period_s)
+            tick += 1
+    except KeyboardInterrupt:
+        pass
 
     cv2.destroyAllWindows()
     node.destroy_node()

@@ -37,12 +37,16 @@ class RGBDDriver(Node):
         self.declare_parameter('dataset_path', self.dataset_path)
         self.declare_parameter('fixed_publish_rate', float(self.fixed_publish_rate))
         self.declare_parameter('show_imgz', False)
+        self.declare_parameter('sync_tolerance_sec', 0.02)  # 20 ms default tolerance
+        self.declare_parameter('skip_handshake', False)
         
         # Override defaults from parameters
         self.settings_name = str(self.get_parameter('settings_name').value)
         self.dataset_path = str(self.get_parameter('dataset_path').value)
         self.fixed_publish_rate = float(self.get_parameter('fixed_publish_rate').value)
         self.show_imgz = bool(self.get_parameter('show_imgz').value)
+        self.sync_tolerance_sec = float(self.get_parameter('sync_tolerance_sec').value)
+        self.skip_handshake = bool(self.get_parameter('skip_handshake').value)
         
         # Topic names
         self.pub_exp_config_name = "/rgbd_py_driver/experiment_settings"
@@ -115,60 +119,41 @@ class RGBDDriver(Node):
             
             print(f"Found {len(rgb_files)} RGB images and {len(depth_files)} depth images")
             
-            # Create a mapping of timestamps to file pairs
-            rgb_timestamps = {}
-            depth_timestamps = {}
+            # Parse timestamps
+            def parse_ts(name: str) -> float:
+                return float(os.path.splitext(name)[0])
+            rgb_ts = [(parse_ts(f), f) for f in rgb_files]
+            depth_ts = [(parse_ts(f), f) for f in depth_files]
+            rgb_ts.sort(key=lambda x: x[0])
+            depth_ts.sort(key=lambda x: x[0])
             
-            # Extract timestamps from RGB filenames
-            for rgb_file in rgb_files:
-                try:
-                    # Extract timestamp from filename (assuming format: timestamp.png)
-                    timestamp_str = rgb_file.split('.')[0]  # Remove extension
-                    timestamp = float(timestamp_str)
-                    rgb_timestamps[timestamp] = rgb_file
-                except (ValueError, IndexError):
-                    print(f"Warning: Could not parse timestamp from RGB file: {rgb_file}")
-                    continue
+            # Approximate matching within tolerance
+            i = j = 0
+            matched = 0
+            while i < len(rgb_ts) and j < len(depth_ts):
+                tr, fr = rgb_ts[i]
+                td, fd = depth_ts[j]
+                diff = tr - td
+                if abs(diff) <= self.sync_tolerance_sec:
+                    # Match
+                    rgb_img = cv2.imread(os.path.join(rgb_path, fr))
+                    depth_img = cv2.imread(os.path.join(depth_path, fd), cv2.IMREAD_ANYDEPTH)
+                    if rgb_img is not None and depth_img is not None:
+                        self.rgb_images.append(rgb_img)
+                        self.depth_images.append(depth_img)
+                        # Use average timestamp
+                        self.timestamps.append(0.5 * (tr + td))
+                        matched += 1
+                    i += 1
+                    j += 1
+                elif diff < 0:
+                    i += 1
+                else:
+                    j += 1
             
-            # Extract timestamps from depth filenames
-            for depth_file in depth_files:
-                try:
-                    # Extract timestamp from filename (assuming format: timestamp.png)
-                    timestamp_str = depth_file.split('.')[0]  # Remove extension
-                    timestamp = float(timestamp_str)
-                    depth_timestamps[timestamp] = depth_file
-                except (ValueError, IndexError):
-                    print(f"Warning: Could not parse timestamp from depth file: {depth_file}")
-                    continue
-            
-            # Find common timestamps (synchronized pairs)
-            common_timestamps = sorted(set(rgb_timestamps.keys()) & set(depth_timestamps.keys()))
-            
-            if not common_timestamps:
-                print("Error: No synchronized RGB-D pairs found!")
-                return
-            
-            print(f"Found {len(common_timestamps)} synchronized RGB-D pairs")
-            
-            # Load synchronized pairs
-            for timestamp in common_timestamps:
-                rgb_file = rgb_timestamps[timestamp]
-                depth_file = depth_timestamps[timestamp]
-                
-                rgb_img = cv2.imread(os.path.join(rgb_path, rgb_file))
-                depth_img = cv2.imread(os.path.join(depth_path, depth_file), cv2.IMREAD_ANYDEPTH)
-                
-                if rgb_img is not None and depth_img is not None:
-                    self.rgb_images.append(rgb_img)
-                    self.depth_images.append(depth_img)
-                    self.timestamps.append(timestamp)  # Use actual timestamp
-                    
-            print(f"Successfully loaded {len(self.rgb_images)} synchronized RGB-D pairs")
-            
-            # Print timestamp range for debugging
-            if self.timestamps:
-                print(f"Timestamp range: {min(self.timestamps):.6f} to {max(self.timestamps):.6f}")
-                print(f"Average frame interval: {(max(self.timestamps) - min(self.timestamps)) / (len(self.timestamps) - 1):.6f}s")
+            print(f"Successfully matched {matched} RGB-D pairs within ±{self.sync_tolerance_sec*1000:.0f} ms tolerance")
+            if matched == 0:
+                print("Warning: No synchronized pairs found. Consider increasing sync_tolerance_sec")
             
         except Exception as e:
             print(f"Error loading dataset: {e}")
@@ -226,17 +211,31 @@ def main(args=None):
     rclpy.init(args=args)
     node = RGBDDriver()
 
-    # Handshake loop
-    rate_handshake = node.create_rate(20)
-    while node.send_config:
-        # Send configuration once per cycle until ACK
-        msg = String()
-        msg.data = node.exp_config_msg
-        node.publish_exp_config_.publish(msg)
-        rclpy.spin_once(node, timeout_sec=0.0)
-        rate_handshake.sleep()
+    if len(node.rgb_images) == 0 or len(node.depth_images) == 0:
+        print("❌ No images loaded. Check dataset_path and folder structure (rgb/ and depth/).")
+        node.destroy_node()
+        rclpy.shutdown()
+        return
 
-    print("Handshake complete")
+    if len(node.timestamps) == 0:
+        print("❌ No synchronized pairs found. Consider increasing -p sync_tolerance_sec (e.g., 0.03 or 0.05).")
+        node.destroy_node()
+        rclpy.shutdown()
+        return
+
+    # Handshake loop (optional)
+    if not node.skip_handshake:
+        print("Waiting for C++ node ACK (set -p skip_handshake:=true to skip)...")
+        rate_handshake = node.create_rate(20)
+        while node.send_config:
+            msg = String()
+            msg.data = node.exp_config_msg
+            node.publish_exp_config_.publish(msg)
+            rclpy.spin_once(node, timeout_sec=0.0)
+            rate_handshake.sleep()
+        print("Handshake complete")
+    else:
+        print("Skipping handshake as requested. Starting stream...")
 
     # Streaming loop at fixed rate
     rate_stream = node.create_rate(node.fixed_publish_rate)

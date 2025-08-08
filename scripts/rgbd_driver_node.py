@@ -18,7 +18,6 @@ import numpy as np
 import os
 import sys
 from cv_bridge import CvBridge
-from rclpy.clock import Clock, ClockType
 
 class RGBDDriver(Node):
     def __init__(self, node_name="rgbd_py_node"):
@@ -83,7 +82,6 @@ class RGBDDriver(Node):
         self.start_frame = 0  # Default 0
         self.end_frame = -1  # Default -1
         self.frame_stop = -1  # Set -1 to use the whole sequence
-        self.show_imgz = False  # Default, False, set True to see the output directly from this node
         self.frame_id = 0  # Integer id of an image frame
         self.frame_count = 0  # Ensure we are consistent with the count number of the frame
         self.inference_time = []  # List to compute average time
@@ -168,6 +166,11 @@ class RGBDDriver(Node):
     def ack_callback(self, msg):
         """Callback for acknowledgement from C++ node"""
         if msg.data == "ACK":
+            if self.skip_handshake:
+                # Ignore ACK when skipping handshake; do not alter flow
+                if self.debug_logging:
+                    print("[DEBUG] ACK received but skip_handshake=True; ignoring.", flush=True)
+                return
             print("Received ACK from C++ node")
             self.send_config = False
             print("Handshake completed! Starting to send images...")
@@ -220,7 +223,8 @@ class RGBDDriver(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = RGBDDriver()
+    node = RGBDDriver("rgbd_py_node")
+    rate = node.create_rate(node.fixed_publish_rate)
 
     if len(node.rgb_images) == 0 or len(node.depth_images) == 0:
         print("❌ No images loaded. Check dataset_path and folder structure (rgb/ and depth/).")
@@ -253,23 +257,13 @@ def main(args=None):
         print("Skipping handshake: sent single config message and starting stream...")
 
     # Streaming loop at fixed rate
-    wall_clock = Clock(clock_type=ClockType.SYSTEM_TIME)
-    from rclpy.rate import Rate
-    rate_stream = Rate(node.fixed_publish_rate, wall_clock)
-    tick = 0
-    try:
-        while rclpy.ok():
-            rclpy.spin_once(node, timeout_sec=0.0)
-            if node.debug_logging and (tick % 10 == 0):
-                print(f"[DEBUG] Loop tick={tick}, idx={node.current_frame_idx}/{len(node.rgb_images)}", flush=True)
-            if not node.publish_next_frame():
-                print("Dataset finished", flush=True)
-                break
-            rate_stream.sleep()
-            tick += 1
-    except KeyboardInterrupt:
-        pass
+    for _ in range(min(len(node.rgb_images), len(node.depth_images))):
+        rclpy.spin_once(node, timeout_sec=0.0)
+        if not node.publish_next_frame():
+            break
+        rate.sleep()
 
+    cv2.destroyAllWindows()
     node.destroy_node()
     rclpy.shutdown()
 

@@ -259,9 +259,11 @@ def main(args=None):
     for _ in range(min(len(node.rgb_images), len(node.depth_images))):
         try:
             rclpy.spin_once(node, timeout_sec=0.0)
-        if not node.publish_next_frame():
+            if not node.publish_next_frame():
+                break
+            rate.sleep()
+        except KeyboardInterrupt:
             break
-        rate.sleep()
 
     cv2.destroyAllWindows()
     node.destroy_node()

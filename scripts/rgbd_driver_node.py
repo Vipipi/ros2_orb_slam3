@@ -26,16 +26,23 @@ class RGBDDriver(Node):
         # Initialize CV bridge
         self.bridge = CvBridge()
         
-        # Configuration parameters
+        # Configuration parameters (defaults)
         self.settings_name = "RealSense_D435i"  # Use D435i RGB-D configuration
-        self.image_seq = "sample_realsense_rgbd"  # Change this to match your dataset path
-        
-        # Path to your dataset
+        self.image_seq = "sample_realsense_rgbd"  # Unused but kept for parity
         self.dataset_path = "/output_images/TEST_DATASET/sample_realsense_rgbd/"
+        self.fixed_publish_rate = 30.0  # Hz
         
-        # Publishing configuration
-        self.use_timestamp_based_publishing = False  # Set to False for constant frame rate
-        self.fixed_publish_rate = 30.0  # Hz (only used if timestamp-based is False)
+        # Declare ROS2 parameters (allow override via --ros-args -p ...)
+        self.declare_parameter('settings_name', self.settings_name)
+        self.declare_parameter('dataset_path', self.dataset_path)
+        self.declare_parameter('fixed_publish_rate', float(self.fixed_publish_rate))
+        self.declare_parameter('show_imgz', False)
+        
+        # Override defaults from parameters
+        self.settings_name = str(self.get_parameter('settings_name').value)
+        self.dataset_path = str(self.get_parameter('dataset_path').value)
+        self.fixed_publish_rate = float(self.get_parameter('fixed_publish_rate').value)
+        self.show_imgz = bool(self.get_parameter('show_imgz').value)
         
         # Topic names
         self.pub_exp_config_name = "/rgbd_py_driver/experiment_settings"

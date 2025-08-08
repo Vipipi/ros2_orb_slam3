@@ -70,6 +70,8 @@ class RGBDDriver(Node):
         self.subscribe_exp_ack_ = self.create_subscription(String, 
                                                            self.sub_exp_ack_name, 
                                                            self.ack_callback, 10)
+
+        self.subscribe_exp_ack_
         
         # Publishers to send RGB and depth images
         self.publish_rgb_img_ = self.create_publisher(Image, self.pub_rgb_img_name, 1)

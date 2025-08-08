@@ -18,6 +18,7 @@ import numpy as np
 import os
 import sys
 from cv_bridge import CvBridge
+import time
 
 class RGBDDriver(Node):
     def __init__(self, node_name="rgbd_py_node"):
@@ -262,7 +263,7 @@ def main(args=None):
             if node.send_config == False:
                 break
         print("Handshake complete")
-        
+
     # Streaming loop at fixed rate
     for _ in range(min(len(node.rgb_images), len(node.depth_images))):
         try:

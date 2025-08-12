@@ -28,25 +28,23 @@ Camera.height: 480
 # Camera frames per second (D435i supports 30fps)
 Camera.fps: 30
 
-# Color order of the images (0: BGR, 1: RGB. D435i typically uses RGB)
+# Color order of the images (0: BGR, 1: RGB). Driver publishes bgr8, so set 0
 Camera.RGB: 0
 
 #--------------------------------------------------------------------------------------------
 # RGB-D specific parameters for D435i
 #--------------------------------------------------------------------------------------------
 
-# Depth scaling factor for D435i
-# D435i depth is in millimeters, so factor is typically 1000.0
-# Adjust this based on your depth image format and units
-RGBD.DepthMapFactor: 1000.0
+# Depth scaling factor
+# Driver publishes depth as 32FC1 in meters -> set factor to 1.0
+RGBD.DepthMapFactor: 1.0
 
-# Close/Far threshold for depth filtering
-# D435i has good depth range, so we can use a wider threshold
-Stereo.ThDepth: 40.0
+# Depth threshold key must be 'ThDepth' (ORB-SLAM3 uses this)
+ThDepth: 40.0
 
-# Stereo baseline (required for RGB-D mode)
-# For D435i, this is the baseline between RGB and depth cameras
-Stereo.b: 0.05
+# Baseline times fx (required key: Camera.bf). For baseline ≈ 0.05 m:
+# Camera.bf = fx * baseline = 382.613 * 0.05 ≈ 19.13
+Camera.bf: 19.13
 
 #--------------------------------------------------------------------------------------------
 # ORB Parameters (optimized for D435i)

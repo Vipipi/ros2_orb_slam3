@@ -31,7 +31,7 @@ class RGBDDriver(Node):
         self.settings_name = "RealSense_D435i"  # Use D435i RGB-D configuration
         self.image_seq = "sample_realsense_rgbd"  # Unused but kept for parity
         self.dataset_path = "/output_images/TEST_DATASET/sample_realsense_rgbd/"
-        self.fixed_publish_rate = 30.0  # Hz
+        self.fixed_publish_rate = 20.0  # Hz
         
         # Declare ROS2 parameters (allow override via --ros-args -p ...)
         self.declare_parameter('settings_name', self.settings_name)

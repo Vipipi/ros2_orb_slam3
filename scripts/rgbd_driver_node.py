@@ -58,7 +58,7 @@ class RGBDDriver(Node):
         self.sub_exp_ack_name = "/rgbd_py_driver/exp_settings_ack"
         self.pub_rgb_img_name = "/rgbd_py_driver/rgb_img_msg"
         self.pub_depth_img_name = "/rgbd_py_driver/depth_img_msg"
-        self.pub_timestep_name = "/rgbd_py_driver/timestep_msg"
+
         
         self.send_config = True  # Set False once handshake is completed with the cpp node
         
@@ -79,7 +79,7 @@ class RGBDDriver(Node):
         # Publishers to send RGB and depth images
         self.publish_rgb_img_ = self.create_publisher(Image, self.pub_rgb_img_name, 1)
         self.publish_depth_img_ = self.create_publisher(Image, self.pub_depth_img_name, 1)
-        self.publish_timestep_msg_ = self.create_publisher(Float64, self.pub_timestep_name, 1)
+
         
         # Initialize work variables for main logic
         self.start_frame = 0  # Default 0
@@ -225,18 +225,17 @@ class RGBDDriver(Node):
             else:
                 depth_msg = self.bridge.cv2_to_imgmsg(depth_img, "32FC1")
             
-            now = self.get_clock().now()
-            rgb_msg.header.stamp = now.to_msg()
-            depth_msg.header.stamp = now.to_msg()
+            # Stamp both images with the dataset timestamp (same for RGB and Depth)
+            sec = int(timestamp)
+            nsec = int((timestamp - sec) * 1e9)
+            stamp = rclpy.time.Time(seconds=sec, nanoseconds=nsec).to_msg()
+            rgb_msg.header.stamp = stamp
+            depth_msg.header.stamp = stamp
             rgb_msg.header.frame_id = "camera_color_optical_frame"
             depth_msg.header.frame_id = "camera_depth_optical_frame"
             
-            # Publish timestep FIRST, then images (matches mono driver flow)
-            ts_msg = Float64()
-            ts_msg.data = float(timestamp)
-            
+            # Publish synchronized images (timestamp in headers)
             try:
-                self.publish_timestep_msg_.publish(ts_msg)
                 self.publish_rgb_img_.publish(rgb_msg)
                 self.publish_depth_img_.publish(depth_msg)
             except Exception as e:
@@ -246,7 +245,7 @@ class RGBDDriver(Node):
                 return False
             
             if self.debug_logging:
-                print(f"[DEBUG] Published frame {self.current_frame_idx+1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz | stamp: {now.nanoseconds/1e9:.6f}", flush=True)
+                print(f"[DEBUG] Published frame {self.current_frame_idx+1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz | stamp: {timestamp:.6f}", flush=True)
 
             # CSV log
             try:

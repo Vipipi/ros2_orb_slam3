@@ -54,7 +54,6 @@ class RGBDMode : public rclcpp::Node
 {   
     public:
     std::string experimentConfig = ""; // String to receive settings sent by the python driver
-    double timeStep; // Timestep data received from the python node
     std::string receivedConfig = "";
 
     // Class constructor
@@ -71,18 +70,18 @@ class RGBDMode : public rclcpp::Node
         std::string nodeName = ""; // Name of this node
         std::string vocFilePath = ""; // Path to ORB vocabulary provided by DBoW2 package
         std::string settingsFilePath = ""; // Path to settings file provided by ORB_SLAM3 package
+        std::string trajectoryOutputDir = "/output_images"; // Directory to save output trajectories
         bool bSettingsFromPython = false; // Flag set once when experiment setting from python node is received
         
         std::string subexperimentconfigName = ""; // Subscription topic name
         std::string pubconfigackName = ""; // Publisher topic name
         std::string subRGBImgMsgName = ""; // Topic to subscribe to receive RGB images
         std::string subDepthImgMsgName = ""; // Topic to subscribe to receive depth images
-        std::string subTimestepMsgName = ""; // Topic to subscribe to receive the timestep
+
 
         // Definitions of publisher and subscribers
         rclcpp::Subscription<std_msgs::msg::String>::SharedPtr expConfig_subscription_;
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr configAck_publisher_;
-        rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr subTimestepMsg_subscription_;
 
         // Message filter subscribers for synchronized RGB-D
         message_filters::Subscriber<sensor_msgs::msg::Image> rgb_sub_;
@@ -101,7 +100,7 @@ class RGBDMode : public rclcpp::Node
 
         // ROS callbacks
         void experimentSetting_callback(const std_msgs::msg::String& msg); // Callback to process settings sent over by Python node
-        void Timestep_callback(const std_msgs::msg::Float64& time_msg); // Callback to process the timestep for this image
+
         void RGBDCallback(const sensor_msgs::msg::Image::ConstSharedPtr& rgb_msg, const sensor_msgs::msg::Image::ConstSharedPtr& depth_msg); // Synchronized RGB-D callback
         
         // Helper functions

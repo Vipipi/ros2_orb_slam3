@@ -59,7 +59,7 @@ RGBDMode::RGBDMode() :Node("rgbd_node_cpp")
     pubconfigackName = "/rgbd_py_driver/exp_settings_ack"; // send an acknowledgement to the python node
     subRGBImgMsgName = "/rgbd_py_driver/rgb_img_msg"; // topic to receive RGB image messages
     subDepthImgMsgName = "/rgbd_py_driver/depth_img_msg"; // topic to receive depth image messages
-    subTimestepMsgName = "/rgbd_py_driver/timestep_msg"; // topic to receive timestep messages
+    // No separate timestep topic; timestamps will be read from image headers
 
     // subscribe to python node to receive settings
     expConfig_subscription_ = this->create_subscription<std_msgs::msg::String>(subexperimentconfigName, 1, std::bind(&RGBDMode::experimentSetting_callback, this, _1));
@@ -75,8 +75,7 @@ RGBDMode::RGBDMode() :Node("rgbd_node_cpp")
     sync_ = std::make_shared<Sync>(approximate_sync_policy(10), rgb_sub_, depth_sub_);
     sync_->registerCallback(std::bind(&RGBDMode::RGBDCallback, this, std::placeholders::_1, std::placeholders::_2));
 
-    // subscribe to receive the timestep
-    subTimestepMsg_subscription_= this->create_subscription<std_msgs::msg::Float64>(subTimestepMsgName, 1, std::bind(&RGBDMode::Timestep_callback, this, _1));
+    // No separate timestep subscription
 
     RCLCPP_INFO(this->get_logger(), "Waiting to finish handshake ......");
 }
@@ -87,8 +86,11 @@ RGBDMode::~RGBDMode()
     // Save trajectories (timestamps match the Float64 timeStep you published)
     try {
         if (pAgent) {
-            pAgent->SaveTrajectoryTUM("FrameTrajectory.txt");
-            pAgent->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+            // Ensure output directory exists and build target paths
+            const std::string frame_path = trajectoryOutputDir + "/FrameTrajectory.txt";
+            const std::string kf_path = trajectoryOutputDir + "/KeyFrameTrajectory.txt";
+            pAgent->SaveTrajectoryTUM(frame_path);
+            pAgent->SaveKeyFrameTrajectoryTUM(kf_path);
         }
     } catch (...) {}
 
@@ -143,10 +145,7 @@ void RGBDMode::initializeVSLAM(std::string& configString){
     std::cout << "RGBDMode node initialized" << std::endl;
 }
 
-// Callback that processes timestep sent over ROS
-void RGBDMode::Timestep_callback(const std_msgs::msg::Float64& time_msg){
-    timeStep = time_msg.data;
-}
+// Removed Timestep_callback; we use header.stamp from image messages
 
 // Synchronized RGB-D callback using message filters
 void RGBDMode::RGBDCallback(const sensor_msgs::msg::Image::ConstSharedPtr& rgb_msg,
@@ -174,8 +173,9 @@ void RGBDMode::RGBDCallback(const sensor_msgs::msg::Image::ConstSharedPtr& rgb_m
         return;
     }
     
-    // Process synchronized pair directly
-    Sophus::SE3f Tcw = pAgent->TrackRGBD(cv_rgb_ptr->image, cv_depth_ptr->image, timeStep);
+    // Use the dataset timestamp from the synchronized header stamp
+    const double ts = rclcpp::Time(rgb_msg->header.stamp).seconds();
+    Sophus::SE3f Tcw = pAgent->TrackRGBD(cv_rgb_ptr->image, cv_depth_ptr->image, ts);
     
     // Debug output for tracking status
     if (Tcw.log().norm() < 1e-10) {

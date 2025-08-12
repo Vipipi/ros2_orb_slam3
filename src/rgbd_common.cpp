@@ -84,10 +84,18 @@ RGBDMode::RGBDMode() :Node("rgbd_node_cpp")
 // Destructor
 RGBDMode::~RGBDMode()
 {   
-    // Stop all threads
-    // Call method to write the trajectory file
+    // Save trajectories (timestamps match the Float64 timeStep you published)
+    try {
+        if (pAgent) {
+            pAgent->SaveTrajectoryTUM("FrameTrajectory.txt");
+            pAgent->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+        }
+    } catch (...) {}
+
     // Release resources and cleanly shutdown
-    pAgent->Shutdown();
+    if (pAgent) {
+        pAgent->Shutdown();
+    }
     pass;
 }
 

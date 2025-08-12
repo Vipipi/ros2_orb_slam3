@@ -41,6 +41,7 @@ class RGBDDriver(Node):
         self.declare_parameter('sync_tolerance_sec', 0.02)  # 20 ms default tolerance
         self.declare_parameter('skip_handshake', True)
         self.declare_parameter('debug_logging', True)
+        self.declare_parameter('log_csv_path', '')
         
         # Override defaults from parameters
         self.settings_name = str(self.get_parameter('settings_name').value)
@@ -50,6 +51,7 @@ class RGBDDriver(Node):
         self.sync_tolerance_sec = float(self.get_parameter('sync_tolerance_sec').value)
         self.skip_handshake = bool(self.get_parameter('skip_handshake').value)
         self.debug_logging = bool(self.get_parameter('debug_logging').value)
+        self.log_csv_path = str(self.get_parameter('log_csv_path').value) if self.get_parameter('log_csv_path').value else ''
         
         # Topic names
         self.pub_exp_config_name = "/rgbd_py_driver/experiment_settings"
@@ -144,6 +146,8 @@ class RGBDDriver(Node):
             # Approximate matching within tolerance
             i = j = 0
             matched = 0
+            self.rgb_filenames = []
+            self.depth_filenames = []
             while i < len(rgb_ts) and j < len(depth_ts):
                 tr, fr = rgb_ts[i]
                 td, fd = depth_ts[j]
@@ -155,6 +159,8 @@ class RGBDDriver(Node):
                     if rgb_img is not None and depth_img is not None:
                         self.rgb_images.append(rgb_img)
                         self.depth_images.append(depth_img)
+                        self.rgb_filenames.append(fr)
+                        self.depth_filenames.append(fd)
                         # Use average timestamp
                         self.timestamps.append(0.5 * (tr + td))
                         matched += 1
@@ -168,6 +174,19 @@ class RGBDDriver(Node):
             print(f"Successfully matched {matched} RGB-D pairs within ±{self.sync_tolerance_sec*1000:.0f} ms tolerance")
             if matched == 0:
                 print("Warning: No synchronized pairs found. Consider increasing sync_tolerance_sec")
+            
+            # Prepare CSV logging if requested
+            self.csv_fp = None
+            if self.log_csv_path:
+                try:
+                    import csv
+                    self.csv_fp = open(self.log_csv_path, 'w', newline='')
+                    self.csv_writer = csv.writer(self.csv_fp)
+                    self.csv_writer.writerow(["frame_idx", "timestamp", "rgb_filename", "depth_filename"])  # header
+                    print(f"Logging published frames to CSV: {self.log_csv_path}")
+                except Exception as e:
+                    print(f"Failed to open CSV log '{self.log_csv_path}': {e}")
+                    self.csv_fp = None
             
         except Exception as e:
             print(f"Error loading dataset: {e}")
@@ -229,6 +248,18 @@ class RGBDDriver(Node):
             if self.debug_logging:
                 print(f"[DEBUG] Published frame {self.current_frame_idx+1}/{len(self.rgb_images)} at {self.fixed_publish_rate}Hz | stamp: {now.nanoseconds/1e9:.6f}", flush=True)
 
+            # CSV log
+            try:
+                if hasattr(self, 'csv_fp') and self.csv_fp:
+                    self.csv_writer.writerow([
+                        self.current_frame_idx,
+                        f"{timestamp:.6f}",
+                        self.rgb_filenames[self.current_frame_idx],
+                        self.depth_filenames[self.current_frame_idx]
+                    ])
+            except Exception as e:
+                print(f"CSV write error: {e}")
+
             self.current_frame_idx += 1
             return True
         except Exception as e:
@@ -286,6 +317,12 @@ def main(args=None):
         pass
 
     cv2.destroyAllWindows()
+    try:
+        if hasattr(node, 'csv_fp') and node.csv_fp:
+            node.csv_fp.close()
+            print(f"Closed CSV log: {node.log_csv_path}")
+    except Exception:
+        pass
     node.destroy_node()
     rclpy.shutdown()
 

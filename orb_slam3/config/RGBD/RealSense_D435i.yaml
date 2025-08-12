@@ -39,12 +39,15 @@ Camera.RGB: 0
 # Driver publishes depth as 32FC1 in meters -> set factor to 1.0
 RGBD.DepthMapFactor: 1.0
 
-# Depth threshold key must be 'ThDepth' (ORB-SLAM3 uses this)
+# Depth threshold key used by some builds
 ThDepth: 40.0
+# Also provide Stereo-prefixed keys for compatibility
+Stereo.ThDepth: 40.0
 
-# Baseline times fx (required key: Camera.bf). For baseline ≈ 0.05 m:
-# Camera.bf = fx * baseline = 382.613 * 0.05 ≈ 19.13
+# Baseline
 Camera.bf: 19.13
+# Also provide Stereo.b for compatibility (baseline in meters)
+Stereo.b: 0.05
 
 #--------------------------------------------------------------------------------------------
 # ORB Parameters (optimized for D435i)

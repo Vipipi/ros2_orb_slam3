@@ -97,6 +97,14 @@ RGBDMode::~RGBDMode()
     // Release resources and cleanly shutdown
     if (pAgent) {
         pAgent->Shutdown();
+
+        // After shutdown, dump corrected trajectories (post loop-closure/pose-graph updates)
+        try {
+            const std::string frame_path_corrected = trajectoryOutputDir + "/FrameTrajectory-corrected.txt";
+            const std::string kf_path_corrected = trajectoryOutputDir + "/KeyFrameTrajectory-corrected.txt";
+            pAgent->SaveTrajectoryTUM(frame_path_corrected);
+            pAgent->SaveKeyFrameTrajectoryTUM(kf_path_corrected);
+        } catch (...) {}
     }
     pass;
 }

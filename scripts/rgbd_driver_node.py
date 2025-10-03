@@ -131,7 +131,7 @@ class RGBDDriver(Node):
             
             # Get sorted list of RGB images with timestamps
             rgb_files = sorted([f for f in os.listdir(rgb_path) if f.endswith(('.png', '.jpg', '.jpeg'))])
-            depth_files = sorted([f for f in os.listdir(depth_path) if f.endswith(('.png', '.jpg', '.jpeg'))])
+            depth_files = sorted([f for f in os.listdir(depth_path) if f.endswith('.npy')])
             
             print(f"Found {len(rgb_files)} RGB images and {len(depth_files)} depth images")
             
@@ -155,7 +155,7 @@ class RGBDDriver(Node):
                 if abs(diff) <= self.sync_tolerance_sec:
                     # Match
                     rgb_img = cv2.imread(os.path.join(rgb_path, fr))
-                    depth_img = cv2.imread(os.path.join(depth_path, fd), cv2.IMREAD_ANYDEPTH)
+                    depth_img = np.load(os.path.join(depth_path, fd), allow_pickle=False)
                     if rgb_img is not None and depth_img is not None:
                         self.rgb_images.append(rgb_img)
                         self.depth_images.append(depth_img)
@@ -223,7 +223,7 @@ class RGBDDriver(Node):
                 depth_img_float = depth_img.astype(np.float32) / 1000.0
                 depth_msg = self.bridge.cv2_to_imgmsg(depth_img_float, "32FC1")
             else:
-                depth_msg = self.bridge.cv2_to_imgmsg(depth_img, "32FC1")
+                depth_msg = self.bridge.cv2_to_imgmsg(depth_img.astype(np.float32), "32FC1")
             
             # Stamp both images with the dataset timestamp (same for RGB and Depth)
             sec = int(timestamp)
